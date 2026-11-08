@@ -3,9 +3,12 @@ import os
 import tempfile
 
 import streamlit as st
+from dotenv import load_dotenv
 
 import agents as A
 from rag import ingest_pdf
+
+load_dotenv()  # reads GOOGLE_API_KEY / GEMINI_MODEL from a local .env file
 
 st.set_page_config(page_title="Paper-to-Presentation & Viva Agent", page_icon="🎓", layout="wide")
 ss = st.session_state
@@ -15,13 +18,33 @@ for k, v in dict(vs=None, msgs=[], last_intent=None, viva=[], paper="").items():
 # ---------------- Sidebar: model + paper ----------------
 with st.sidebar:
     st.header("⚙️ Settings")
-    provider = st.selectbox("LLM provider", ["Ollama (local)", "Google Gemini (API)"])
-    default_model = "llama3.1:8b" if provider.startswith("Ollama") else "gemini-3.8-flash"
-    model = st.text_input("Model name", default_model)
+    provider = st.selectbox("LLM provider", ["Google Gemini (API)", "Ollama (local)"])
     api_key = ""
     if provider.startswith("Google"):
+        presets = ["gemini-3.8-flash", "gemini-3.6-flash", "Custom..."]
+        env_model = os.getenv("GEMINI_MODEL", "")
+        if env_model and env_model not in presets:
+            presets.insert(0, env_model)
+        choice = st.selectbox("Gemini model", presets,
+                              help="Model names change over time. If you see NOT_FOUND, pick "
+                                   "another or choose Custom and type a current name from "
+                                   "https://ai.google.dev/gemini-api/docs/models")
+        model = st.text_input("Custom model name", "gemini-3.8-flash") if choice == "Custom..." else choice
         api_key = st.text_input("Gemini API key", type="password",
-                                value=os.getenv("GOOGLE_API_KEY", ""))
+                                value=os.getenv("GOOGLE_API_KEY", ""),
+                                help="Free key: https://aistudio.google.com/apikey  "
+                                     "(or put it in a .env file)")
+        if not api_key:
+            st.warning("Paste your Gemini API key above (get one free at aistudio.google.com/apikey).")
+    else:
+        model = st.text_input("Ollama model", "llama3.1:8b",
+                              help="Run `ollama pull llama3.1:8b` first")
+    if st.button("🔌 Test connection"):
+        try:
+            A.get_llm(provider, model, api_key).invoke("Reply with: OK")
+            st.success("Connected - model responded.")
+        except Exception as e:
+            st.error(friendly_error(e))
     use_reflection = st.checkbox("Reflection (grounding check)", True)
     n_slides = st.slider("Slides", 5, 15, 8)
     n_q = st.slider("Viva questions", 4, 15, 8)
@@ -39,6 +62,19 @@ with st.sidebar:
         st.success(f"Indexed {n} chunks")
     if ss.paper:
         st.caption(f"Active paper: {ss.paper}")
+
+
+def friendly_error(e) -> str:
+    t = str(e)
+    if "API key" in t or "api_key" in t or "API_KEY_INVALID" in t or "PERMISSION_DENIED" in t:
+        return "🔑 API key missing or invalid. Paste a valid key in the sidebar (aistudio.google.com/apikey)."
+    if "NOT_FOUND" in t:
+        return "🤖 Model not found. Pick another Gemini model in the sidebar or choose Custom and type a current name."
+    if "429" in t or "RESOURCE_EXHAUSTED" in t:
+        return "⏳ Rate limit reached. Wait a minute or untick Reflection in the sidebar."
+    if "504" in t or "503" in t or "DEADLINE" in t or "UNAVAILABLE" in t:
+        return "🐢 Google is slow or overloaded. Retry, or switch to another model in the sidebar."
+    return f"⚠️ Error: {t}"
 
 
 def llm():
@@ -132,7 +168,7 @@ with tab_chat:
                     try:
                         msg = handle(user_text)
                     except Exception as e:
-                        msg = {"role": "assistant", "content": f"⚠️ Error: {e}"}
+                        msg = {"role": "assistant", "content": friendly_error(e)}
                 render(msg, len(ss.msgs))
             ss.msgs.append(msg)
 
