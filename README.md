@@ -1,26 +1,22 @@
-# 🎓 PaperMate AI – Research Paper Assistant
+# Paper-to-Presentation & Viva Agent
 
-🚀 **Live Demo:** [Try PaperMate AI](https://papermate-ai-n8fc2ekx2elrr8ajcvzhap.streamlit.app/)
+## Setup
+python -m venv venv && source venv/bin/activate   (Windows: venv\Scripts\activate)
+pip install -r requirements.txt
 
-PaperMate AI is an Agentic AI-powered research paper assistant that helps students understand research papers and prepare for academic presentations and vivas.
+## LLM option A: local (free)
+Install Ollama from https://ollama.com, then:  ollama pull llama3.1:8b
 
-### ✨ Features
+## LLM option B: API
+Get a Gemini key from https://aistudio.google.com and paste it in the sidebar.
 
-- 📄 Research Paper Summarization
-- 🧠 Concept Explanation
-- 📊 Presentation Slide Generation
-- ❓ Viva Questions and Answers
-- 🔎 Agentic RAG with ChromaDB
-- 🤖 Intent Detection and Agent Routing
+## Run
+streamlit run app.py
 
-### 🛠️ Technologies Used
-
-Python, Streamlit, Google Gemini API, LangChain, ChromaDB.
-
-### 🚀 Try It
-
-1. Open the [PaperMate AI application](https://papermate-ai-n8fc2ekx2elrr8ajcvzhap.streamlit.app/).
-2. Upload a research paper in PDF format.
-3. Choose the feature you want.
-4. Get AI-generated assistance.
-
+## Configuring Gemini (key + model)
+1. Get a free key: https://aistudio.google.com/apikey
+2. Either paste it in the app sidebar, or copy `.env.example` to `.env` and edit it.
+3. Choose a model in the sidebar dropdown (or "Custom..." to type any current model name).
+   Model names change over time: https://ai.google.dev/gemini-api/docs/models
+4. Click "Test connection" to verify before using the assistant.
+Do not commit `.env` (add it to .gitignore).
