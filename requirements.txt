@@ -10,4 +10,5 @@ langchain-ollama
 langchain-google-genai
 chromadb
 pypdf
+python-dotenv
 python-pptx
