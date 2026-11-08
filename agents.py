@@ -122,7 +122,7 @@ def get_llm(provider: str, model: str, api_key: str = "", temperature: float = 0
         return ChatOllama(model=model, temperature=temperature)
     from langchain_google_genai import ChatGoogleGenerativeAI
     return ChatGoogleGenerativeAI(model=model, google_api_key=api_key, temperature=temperature,
-                                  max_retries=2, timeout=120)
+                                  max_retries=1, timeout=45)
 
 
 def chain(name: str, llm, json_out: bool = False):
@@ -162,8 +162,11 @@ def route_intent(llm, request: str, last_intent):
         if res.get("intent") in INTENTS:
             res.setdefault("query", "")
             return res
-    except Exception:
-        pass
+    except Exception as e:
+        # Only fall back to keywords when the model's JSON was malformed.
+        # API/network errors (timeout, bad key...) must surface immediately.
+        if "Parse" not in type(e).__name__:
+            raise
     return _keyword_route(request, last_intent)  # robust fallback for small local models
 
 
