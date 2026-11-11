@@ -21,7 +21,7 @@ with st.sidebar:
     provider = st.selectbox("LLM provider", ["Google Gemini (API)", "Ollama (local)"])
     api_key = ""
     if provider.startswith("Google"):
-        presets = ["gemini-3.8-flash", "gemini-3.6-flash", "Custom..."]
+        presets = ["gemini-3.1-flash-lite", "gemini-3.6-flash", "Custom..."]
         env_model = os.getenv("GEMINI_MODEL", "")
         if env_model and env_model not in presets:
             presets.insert(0, env_model)
@@ -29,7 +29,7 @@ with st.sidebar:
                               help="Model names change over time. If you see NOT_FOUND, pick "
                                    "another or choose Custom and type a current name from "
                                    "https://ai.google.dev/gemini-api/docs/models")
-        model = st.text_input("Custom model name", "gemini-3.8-flash") if choice == "Custom..." else choice
+        model = st.text_input("Custom model name", "gemini-3.1-flash-lite") if choice == "Custom..." else choice
         api_key = st.text_input("Gemini API key", type="password",
                                 value=os.getenv("GOOGLE_API_KEY", ""),
                                 help="Free key: https://aistudio.google.com/apikey  "
