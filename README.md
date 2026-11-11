@@ -1,4 +1,4 @@
-# 🎓 Paper-to-Presentation & Viva Agent
+# 🎓 Paper-to-Presentation & Viva Agent 
 
 An AI assistant that turns a research paper (PDF) into a **summary**, a **slide deck (.pptx)**, **concept explanations** and **viva practice**, all grounded in the paper's own text.
 
