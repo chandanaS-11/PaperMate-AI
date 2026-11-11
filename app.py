@@ -12,7 +12,7 @@ load_dotenv()  # reads GOOGLE_API_KEY / GEMINI_MODEL from a local .env file
 
 st.set_page_config(page_title="Paper-to-Presentation & Viva Agent", page_icon="🎓", layout="wide")
 ss = st.session_state
-for k, v in dict(vs=None, msgs=[], last_intent=None, viva=[], paper="").items():
+for k, v in dict(vs=None, msgs=[], last_intent=None, viva=[], paper="", cache={}).items():
     ss.setdefault(k, v)
 
 # ---------------- Sidebar: model + paper ----------------
@@ -45,7 +45,7 @@ with st.sidebar:
             st.success("Connected - model responded.")
         except Exception as e:
             st.error(friendly_error(e))
-    use_reflection = st.checkbox("Reflection (grounding check)", True)
+    use_reflection = st.checkbox("Reflection (grounding check, uses extra API call)", False)
     n_slides = st.slider("Slides", 5, 15, 8)
     n_q = st.slider("Viva questions", 4, 15, 8)
     chat_h = st.slider("Chat window height (px)", 300, 800, 480, 20)
@@ -58,7 +58,7 @@ with st.sidebar:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as f:
                 f.write(data)
             ss.vs, n = ingest_pdf(f.name, data)
-            ss.paper, ss.msgs, ss.last_intent, ss.viva = pdf.name, [], None, []
+            ss.paper, ss.msgs, ss.last_intent, ss.viva, ss.cache = pdf.name, [], None, [], {}
         st.success(f"Indexed {n} chunks")
     if ss.paper:
         st.caption(f"Active paper: {ss.paper}")
@@ -70,8 +70,10 @@ def friendly_error(e) -> str:
         return "🔑 API key missing or invalid. Paste a valid key in the sidebar (aistudio.google.com/apikey)."
     if "NOT_FOUND" in t:
         return "🤖 Model not found. Pick another Gemini model in the sidebar or choose Custom and type a current name."
+    if "PerDay" in t or "limit: 0" in t:
+        return "📛 Daily free quota used up for this model. Switch to another Gemini model in the sidebar, or try again tomorrow."
     if "429" in t or "RESOURCE_EXHAUSTED" in t:
-        return "⏳ Rate limit reached. Wait a minute or untick Reflection in the sidebar."
+        return "⏳ Rate limit still reached after auto-retries. Wait 1-2 minutes, keep Reflection off, or switch model."
     if "504" in t or "503" in t or "DEADLINE" in t or "UNAVAILABLE" in t:
         return "🐢 Google is slow or overloaded. Retry, or switch to another model in the sidebar."
     return f"⚠️ Error: {t}"
@@ -113,12 +115,25 @@ HANDLERS = {"chat": do_chat, "summary": do_summary, "concept": do_concept,
 
 
 def handle(req):
-    route = A.route_intent(llm(), req, ss.last_intent)           # 1) detect intent
+    rk = ("route", req.strip().lower(), ss.last_intent)
+    if rk not in ss.cache:
+        ss.cache[rk] = A.route_intent(llm(), req, ss.last_intent)  # 1) detect intent
+    route = ss.cache[rk]
     intent = route["intent"]
     if intent != "chat" and ss.vs is None:
         return {"role": "assistant", "content": "Please upload and process a paper first."}
     ss.last_intent = intent                                      # retain task in context
-    text, pptx, docs = HANDLERS[intent](req, route)              # 2) route (+ retrieval inside)
+    key = (intent, route.get("query", ""), n_slides, n_q, use_reflection)
+    if intent != "chat" and key in ss.cache:                     # repeat request -> no API call
+        text, pptx, docs = ss.cache[key]
+        if intent == "viva":
+            ss.viva = ss.cache[("viva_list",)]
+    else:
+        text, pptx, docs = HANDLERS[intent](req, route)          # 2) route (+ retrieval inside)
+        if intent != "chat":
+            ss.cache[key] = (text, pptx, docs)
+            if intent == "viva":
+                ss.cache[("viva_list",)] = ss.viva
     trace = (f"**Intent:** `{intent}` | **Retrieval:** "
              f"{'yes' if route.get('needs_retrieval') else 'no (answered directly)'} | "
              f"**Chunks used:** {len(docs)}")
