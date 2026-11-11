@@ -11,4 +11,4 @@ langchain-google-genai
 chromadb
 pypdf
 python-dotenv
-python-pptx
+python-pptx 
