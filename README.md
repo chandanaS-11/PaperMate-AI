@@ -45,17 +45,7 @@ Open http://localhost:8501 (the first run downloads a ~90 MB embedding model).
 
 > Send one request at a time and wait for the answer.
 
-## ✅ Assignment Criteria
 
-| # | Criterion | Where |
-|---|---|---|
-| 1 | LLM integration | `get_llm()` in `agents.py` |
-| 2 | Interactive GUI | `app.py` (Streamlit) |
-| 3 | Prompt engineering | `PROMPTS` in `agents.py` |
-| 4 | LangChain + LCEL | `chain()` = `prompt \| llm \| parser` |
-| 5 | Agentic RAG | Router decides retrieval; agents ground answers |
-| 6 | Intent routing | `route_intent()` + handlers in `app.py` |
-| 7 | Vector database | ChromaDB in `rag.py` |
 
 ## ⚠️ Limitations
 
