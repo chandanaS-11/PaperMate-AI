@@ -1,4 +1,4 @@
-"""app.py - Streamlit GUI (Acceptance criterion 2). Run: streamlit run app.py"""
+"""app.py - Streamlit GUI (Acceptance criterion 2). Run: streamlit run app.py""" 
 import os
 import tempfile
 
