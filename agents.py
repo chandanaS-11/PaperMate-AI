@@ -7,10 +7,13 @@ Criteria covered here:
   6 Intent routing      -> route_intent() + dispatch in app.py
 """
 import json
+import re
+import time
 from io import BytesIO
 
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableLambda
 
 from rag import format_docs, retrieve, retrieve_multi
 
@@ -125,11 +128,37 @@ def get_llm(provider: str, model: str, api_key: str = "", temperature: float = 0
                                   max_retries=1, timeout=45)
 
 
+_last_call = [0.0]
+MIN_GAP = 4.0  # seconds between LLM calls (protects free-tier requests-per-minute)
+
+
+def _guarded(llm):
+    """Throttle calls and auto-retry on 429 rate limits (waits the delay Google asks for)."""
+    def call(prompt_value):
+        for attempt in range(3):
+            wait_gap = MIN_GAP - (time.time() - _last_call[0])
+            if wait_gap > 0:
+                time.sleep(wait_gap)
+            _last_call[0] = time.time()
+            try:
+                return llm.invoke(prompt_value)
+            except Exception as e:
+                t = str(e)
+                limited = "429" in t or "RESOURCE_EXHAUSTED" in t
+                daily = "PerDay" in t or "limit: 0" in t
+                if limited and not daily and attempt < 2:
+                    m = re.search(r"retry(?: in|Delay'?:?\s*')\s*([\d.]+)", t)
+                    time.sleep(min(float(m.group(1)) + 1 if m else 20, 45))
+                    continue
+                raise
+    return RunnableLambda(call)
+
+
 def chain(name: str, llm, json_out: bool = False):
-    """LCEL: PromptTemplate | LLM | OutputParser."""
+    """LCEL: PromptTemplate | (throttled) LLM | OutputParser."""
     system, user = PROMPTS[name]
     prompt = ChatPromptTemplate.from_messages([("system", system), ("human", user)])
-    return prompt | llm | (JsonOutputParser() if json_out else StrOutputParser())
+    return prompt | _guarded(llm) | (JsonOutputParser() if json_out else StrOutputParser())
 
 
 def reflect(llm, draft: str, context: str) -> str:
